@@ -148,7 +148,12 @@ void regression_to_file(MLP* mlp, string filename, vector<vector<float> > data,
                         vector<float> scaler = vector<float> ())
 {
     ofstream ofile (filename);
-
+    stringstream header;
+    header << "# " << "Giang Pham \t Sammat Fareed" << endl;
+    header << "# " << "The noobs" << endl;
+    header << "# ML-CUP20" << endl;
+    header << "# Submission Date: 05/01/2021" << endl;
+    ofile << header.str();
     for(int i = 0; i < data.size(); i++)
     {
         vector<float> bias_sample = data[i];
@@ -158,6 +163,7 @@ void regression_to_file(MLP* mlp, string filename, vector<vector<float> > data,
         {
             // cout << "decoding"<< endl;
             stringstream real_out;
+            real_out << i+1 << ",";
             for(int j = 0; j < out.size(); j++)
             {
                 float realval;
@@ -238,6 +244,9 @@ float kfold_validation(MLP* mlp, int mode, int task,
 
     float totres = 0.0f;
 
+    float tottrres = 0.0f;
+    float trmee = 0.0f;
+
     for (int i = 0; i < k; i++) //each fold works as a validation set once 
     {
         int beg_val_fold; 
@@ -273,19 +282,21 @@ float kfold_validation(MLP* mlp, int mode, int task,
         cout << "Traing data size: " << trdata.size() << endl;
         cout << "Validation data size: " << vdata.size() << endl;
         #endif 
+        float trres;
         switch (mode)
         {
         case 2: // batch learning
-            mlp->train_batch(trdata, trtarget, ep, num_iter, eta, alfa, lambda);
+            trres = mlp->train_batch(trdata, trtarget, ep, num_iter, eta, alfa, lambda);
             break;
         default: // stochastic learning
-            mlp->train_stochastic(trdata, trtarget, ep, num_iter, eta, alfa, lambda);
+            trres = mlp->train_batch(trdata, trtarget, ep, num_iter, eta, alfa, lambda);
             break;
         }
-
+        tottrres += trres;
 
         //test with validation set 
         float kres = 0.0f;
+        float ktrmee = 0.0f;
         switch (task)
         {
         case 1: // for binary classify 
@@ -294,8 +305,11 @@ float kfold_validation(MLP* mlp, int mode, int task,
             break;
         case 2: // for multi regression 
             kres = regression_evaluate(mlp, vdata, vtarget, scaler);
+            ktrmee = regression_evaluate(mlp, trdata, trtarget, scaler);
+
             totres += kres;
-            cout << "Fold " << i << "-th: " << kres << endl;
+            trmee += ktrmee;
+            cout << "Fold " << i << "-th: Train mse" << trres << "\t val mee: " << kres << "\t train mee: " << ktrmee << endl;
             break;
         default:
             totres += regression_evaluate(mlp, vdata, vtarget, scaler);
@@ -305,6 +319,7 @@ float kfold_validation(MLP* mlp, int mode, int task,
         //reset the model to retrain
         mlp->reset_mlp();
     }
+    cout << "Val MEE: " << totres/k << "\t Train MEE: " << trmee/k << "\t Train MSE: " << tottrres/k << endl;
     return totres/k;
 }
 
@@ -373,6 +388,7 @@ void train_with_early_stopping (MLP* mlp, int mode, float ratio, float ep,
                                 vector<float> scaler = vector<float> (), 
                                 string filename = "training-curve.csv")
 {
+    auto t1 = std::chrono::high_resolution_clock::now();
     //check size of data and target 
     #ifdef DEBUG 
     cout << "Size of data set " << data.size() << endl;
@@ -420,12 +436,11 @@ void train_with_early_stopping (MLP* mlp, int mode, float ratio, float ep,
     cout << "Number of training data: " << trdata.size() << endl;
 
     //open file to save the information 
+    int n_iter = 0;
+    int max_iter = 8000;
     ofstream inf(filename);
-
     if (mode == 1) //stochastic 
     {
-        int max_iter = 100000;
-        int n_iter = 0;
         int incount = 0;
         
         float oldres = regression_evaluate(mlp, stopdata, stoptarget, scaler);
@@ -443,19 +458,18 @@ void train_with_early_stopping (MLP* mlp, int mode, float ratio, float ep,
                 incount = 0;
             }
             //stop if stop score increase in 10 continuous iters or if the result increase dramatically
-            if (incount > 10 || res - oldres > 0.2f) break; 
+            // if (incount > 10 || res - oldres > 0.2f) break; 
             oldres = res;
 
             stringstream ss;
             ss.clear(); ss << i << "\t" << trres << "\t" << res << endl;
             cout << i << "\t" << trres << "\t" << res << endl;
             inf << ss.str();
+            n_iter ++;
         } 
     }
     else // batch
     {
-        int max_iter = 100000;
-        int n_iter = 0;
         int incount = 0;
         float oldres = regression_evaluate(mlp, stopdata, stoptarget, scaler);
         
@@ -472,15 +486,20 @@ void train_with_early_stopping (MLP* mlp, int mode, float ratio, float ep,
                 incount = 0;
             }
             //stop if stop score increase in 10 continuous iters or if the result increase dramatically
-            if (incount > 10 || res - oldres > 0.2f) break; 
+            // if (incount > 10 || res - oldres > 0.2f) break; 
             oldres = res;
 
             stringstream ss;
             ss.clear(); ss << i << "\t" << trres << "\t" << res << endl;
             cout << i << "\t" << trres << "\t" << res << endl;
             inf << ss.str();
+            n_iter ++;
         } 
     }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
+    std::cout << "Train with: " << n_iter << " epochs in " << duration << endl;
+    cout << "Average time: " << (float) duration /(float) n_iter << endl;
     mlp->save_model(modelname);
 }
 

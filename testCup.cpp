@@ -18,6 +18,7 @@
 using namespace std; 
 
 #define CUP_ROOT    "/Users/phamgiang/Study/Master/ThirdSemeter/ML/MLProject/CUP/"
+#define MODEL       "/Users/phamgiang/Study/Master/ThirdSemeter/ML/MLProject/model-cup/final.model"
 
 #define TRFILE      "train.csv"
 #define INTSFILE    "ints.csv"
@@ -116,12 +117,12 @@ void read_trdata(string trname, vector<int> &alltridx, vector<vector<float> > &a
  * - tsidx: vector will contain the test index,
  * - tsdata: vector will contain the test data
  * */
-void read_tsdata(vector<int> &tsidx, vector<vector<float> > &tsdata)
+void read_tsdata(vector<int> &tsidx, vector<vector<float> > &tsdata, string filename)
 {
     //clear all the vector first 
     tsidx.clear();
     tsdata.clear();
-    string tsname= string(CUP_ROOT) + string("ML-CUP20-TS.csv");
+    string tsname= filename;
 
     //read test file
     ifstream tsfile(tsname);
@@ -129,10 +130,14 @@ void read_tsdata(vector<int> &tsidx, vector<vector<float> > &tsdata)
     {
         string line;
 
-        //get rid of 7 first lines
-        for(int i = 0; i < 7; i++)
+        //get rid of 7 first lines from the original data 
+        // if (tsname == string(CUP_ROOT) + string(ALLTRFILE) || 
+        //     tsname == string(CUP_ROOT) + string(REALTEST))
         {
-            getline(tsfile, line); 
+            for(int i = 0; i < 7; i++)
+            {
+                getline(tsfile, line); 
+            }
         }
         while(getline(tsfile, line))
         {
@@ -376,7 +381,7 @@ vector<vector<float> > normalize_data(vector<vector<float> > data, vector<vector
     return ndata;
 }
 
-
+/*
 void k_fold_cup()
 {
     vector<int> tridx;
@@ -416,6 +421,8 @@ void k_fold_cup()
     delete mlp;
 
 }
+*/
+
 
 /**
  * Just a function to get some strange result from strange models
@@ -494,10 +501,9 @@ vector<float> grid_search_cup ()
     vector<int> hid{16, 12, 12, 8, 4};
     MLP* mlp = new MLP(n_in, n_out, hid.size(), hid, "gauss", "linear");
 
-    vector<float> etas {0.37f, 0.41f, 0.45f};
-    vector<float> alfas {0.008, 0.011, 0.015};
-    // vector<float> alfas{0.0f};
-    vector<float> lambdas {0.000095, 0.00011, 0.00015};
+    vector<float> etas {0.41f};
+    vector<float> alfas {0.015};
+    vector<float> lambdas {9.5e-5};
     
     float besres = 10000.0f;
     vector<float> besparas;
@@ -555,7 +561,7 @@ void run_just_once()
 }
 
 /**
- * Function to train the final model
+ * Function to train the final model the test the trained model with internal test set
  * */
 void final_train()
 {
@@ -575,7 +581,7 @@ void final_train()
     vector<int> hid{16, 12, 8, 8, 4};
     MLP* mlp = new MLP(n_in, n_out, hid.size(), hid, "gauss", "linear");
 
-    train_with_early_stopping(mlp, 2, 0.15, 0.00001f, trdata, trtarget, 0.21, 0.0011, 9.5e-5, "third.model", scaler, "third.csv");
+    train_with_early_stopping(mlp, 2, 0.2, 0.00001f, trdata, trtarget, 0.16, 0.00097, 0.00011, "tem.model", scaler, "tem.csv");
 
     //test the internal test set to get the final result
     vector<int> intsidx;
@@ -598,36 +604,45 @@ void final_train()
  * - testname: name of the test 
  * - outname: name of the output file 
  * */
-void load_and_test(string modelname, string testname, string outname)
+void load_model_and_test(string modelname, string testname, string outname)
 {
     //load the model 
-    MLP * mlp = new MLP("second.model");
+    MLP * mlp = new MLP(modelname);
 
     vector<int> intsidx;
     vector<vector<float> > intsdata;
-    vector<vector<float> > intstarget;
 
-    read_trdata(testname, intsidx, intsdata, intstarget);
-    //preprocess
-    preprocess(intstarget);
+    vector<int> tridx;
+    vector<vector<float> > trdata;
+    vector<vector<float> > trtarget;
+
+    read_trdata(string(CUP_ROOT) +string(TRFILE), tridx, trdata, trtarget);
+
+    preprocess(trtarget);
+
+    float alltrres = regression_evaluate(mlp, trdata, trtarget, scaler);
+    
+    cout << "All train MEE: " << alltrres << endl;
+
+    read_tsdata(intsidx, intsdata, testname);
 
     regression_to_file(mlp, outname, intsdata, scaler);
-
 }
 
 int main(int argc, char** argv)
 {
     // test_unit();
     srand(time(NULL));
-    final_train();
 
-    // string testname = string(CUP_ROOT) + string(INTSFILE);
-
-    // load_and_test("second.model", testname);
-
-
-    // vector<float> gsres = grid_search_cup();
-    // cout <<"Best:" << "e=" <<gsres[0] << ",a=" << gsres[1] << ",l=" << gsres[2] << "\t" << gsres[3] << endl;
-
+    //train and then test with internal test set.
+    // final_train();
+    // grid_search_cup();
+    
+    string testfile = "ML-CUP20-TS.csv";
+    string testname = string (CUP_ROOT) + string(testfile);
+    string outname = string (CUP_ROOT) + string("noob.csv");
+    load_model_and_test(MODEL, testname, outname);
+    
+    
     return 0;
 }
