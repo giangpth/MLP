@@ -1,5 +1,5 @@
 # MLP
-Implement a feed forward neural networl <br/>
+Implement a feed forward neural networ <br/>
 To implement the multilayer perceptron, I use three classes: MLP, Unit and Activation as depicted in Figure 1. <br/>
 In which, MLP is the multilayer perceptron which contains multiple units and these units are connected to each other according to the architecture of the network.<br/>
 Inside each unit, there is an activation function belonging to one of these types: sigmoid, tanh, relu, softplus, leaky relu, gauss and linear. Units also contain the weights that connect the unit with other units of the next layer in the network. With these components, we can construct varied networks with different architectures such as various number of hidden layers or different activation function for each layer. <br/>
